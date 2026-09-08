@@ -1,0 +1,18 @@
+# Опциональный оверлей: положить SQLite в обычную папку Windows, чтобы DBeaver
+# открывал её вживую, без снимков.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dbeaver.yml up -d
+#
+# ВАЖНО:
+#  * Папка должна быть ВНЕ OneDrive/Dropbox. Sync-клиент не понимает WAL/SHM
+#    и способен повредить базу.
+#  * Bind-mount на Windows идёт через слой виртуализации, у которого блокировки
+#    работают не так, как на нативной ФС. Для демо годится, для нагрузки — нет.
+#    Безопасный вариант по умолчанию — named volume + снимок (см. README).
+#  * Первый запуск с оверлеем создаст ПУСТУЮ базу. Чтобы сохранить текущую,
+#    сначала скопируйте её:
+#      docker compose cp api:/data/harness.db C:/harness-data/harness.db
+services:
+  api:
+    volumes:
+      - C:/harness-data:/data

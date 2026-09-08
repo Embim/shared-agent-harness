@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Harness</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ------------------------------------------------------------- логин -->
+<section id="login" class="login">
+  <form id="login-form" class="login-card">
+    <h1>Harness</h1>
+    <p class="muted">Локальный агент-харнес. Общая сессия, параллельное управление.</p>
+    <label>Пользователь<input id="login-name" autocomplete="username" required></label>
+    <label>Пароль<input id="login-pass" type="password" autocomplete="current-password" required></label>
+    <button type="submit">Войти</button>
+    <div id="login-error" class="error" hidden></div>
+    <div class="hint">по умолчанию <code>admin</code> / <code>admin</code></div>
+  </form>
+</section>
+
+<!-- --------------------------------------------------------------- app -->
+<div id="app" class="app" hidden>
+
+  <header class="top">
+    <div class="brand">Harness</div>
+    <div id="session-title" class="sess-title">—</div>
+    <select id="model-select" class="model-select" title="модель этой сессии"></select>
+    <div id="state-pill" class="pill idle">idle</div>
+    <div id="conn-pill" class="pill conn-off" title="состояние SSE">offline</div>
+    <div class="spacer"></div>
+    <div id="whoami" class="whoami"></div>
+    <button id="btn-logout" class="ghost">выйти</button>
+  </header>
+
+  <aside class="side">
+    <div class="side-block">
+      <div class="side-head">
+        <span>Сессии</span>
+        <button id="btn-new" class="mini">+ новая</button>
+      </div>
+      <ul id="session-list" class="sessions"></ul>
+    </div>
+
+    <div class="side-block">
+      <div class="side-head"><span>Твои инструменты</span></div>
+      <ul id="tool-list" class="tools"></ul>
+    </div>
+
+    <div class="side-block" id="admin-block" hidden>
+      <div class="side-head">
+        <span>Пользователи</span>
+        <button id="btn-adduser" class="mini">+ добавить</button>
+      </div>
+      <ul id="user-list" class="users"></ul>
+    </div>
+
+    <div class="side-block">
+      <div class="side-head"><span>Здоровье</span></div>
+      <div id="health" class="health muted">—</div>
+    </div>
+  </aside>
+
+  <main class="feed" id="feed"></main>
+
+  <footer class="composer">
+    <textarea id="input" rows="2" placeholder="Сообщение агенту.  Enter — отправить, Shift+Enter — перенос строки."></textarea>
+    <div class="composer-actions">
+      <span id="queue-note" class="muted"></span>
+      <button id="btn-cancel" class="danger" disabled>стоп</button>
+      <button id="btn-send">отправить</button>
+    </div>
+  </footer>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

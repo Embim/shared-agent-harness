@@ -1,0 +1,92 @@
+name: harness
+
+services:
+  # ------------------------------------------------------------------ порт 1
+  # Статика (HTML-морда). Отдаётся отдельным uvicorn-ом, без nginx.
+  web:
+    build: ./web
+    init: true
+    environment:
+      - PORT=3000
+    ports:
+      - "${BIND_ADDR:-0.0.0.0}:3000:3000"
+    networks: [edge]
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------ порт 2
+  # API: auth (JWT), сессии, agent loop, SSE-стрим. Единственный, кто
+  # ходит и в LLM-провайдера (сеть edge), и в песочницу (сеть sandbox).
+  api:
+    build: ./api
+    init: true
+    # ВАЖНО: 1 воркер. In-memory состояние сессий и single-writer в SQLite
+    # рассыпаются при нескольких воркерах.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    environment:
+      HARNESS_DB: /data/harness.db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      JWT_TTL_MIN: ${JWT_TTL_MIN:-720}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      EXECUTOR_URL: http://executor:9000
+      EXECUTOR_TOKEN: ${EXECUTOR_TOKEN:-dev-executor-token}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5-coder:7b}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      MAX_ITERATIONS: ${MAX_ITERATIONS:-12}
+      MAX_CONCURRENT_TOOLS: ${MAX_CONCURRENT_TOOLS:-4}
+      TOOL_TIMEOUT: ${TOOL_TIMEOUT:-60}
+    volumes:
+      # Named volume, НЕ bind-mount. Бинд SQLite в синхронизируемую папку
+      # (OneDrive/Dropbox) = повреждение БД: sync-клиент не понимает WAL/SHM.
+      - dbdata:/data
+    ports:
+      - "${BIND_ADDR:-0.0.0.0}:8000:8000"
+    networks: [edge, sandbox]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      executor:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------ порт 3
+  # Песочница исполнения тулов. НЕТ секции ports: наружу не публикуется.
+  # Сеть sandbox помечена internal -> из неё нет выхода в интернет.
+  executor:
+    build: ./executor
+    init: true                      # tini: жнёт зомби от bash-подпроцессов
+    user: "10001:10001"             # non-root
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000", "--workers", "1"]
+    environment:
+      EXECUTOR_TOKEN: ${EXECUTOR_TOKEN:-dev-executor-token}
+      WORKSPACE: /workspace
+      TOOL_TIMEOUT: ${TOOL_TIMEOUT:-60}
+      MAX_OUTPUT_BYTES: ${MAX_OUTPUT_BYTES:-32768}
+    volumes:
+      - workspace:/workspace
+    networks: [sandbox]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    mem_limit: 512m
+    pids_limit: 256                 # форк-бомба не кладёт хост
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:9000/health').read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  dbdata:
+  workspace:
+
+networks:
+  edge:
+  sandbox:
+    internal: true
